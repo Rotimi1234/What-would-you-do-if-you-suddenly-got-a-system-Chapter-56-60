@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Eclipse Protocol — Chapters 56–60</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,500;0,8..60,600;1,8..60,400&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #0a0d12;
+    --bg-elevated: #10141b;
+    --panel: #12161f;
+    --panel-border: #232a37;
+    --text: #dfe3e9;
+    --text-dim: #838d9c;
+    --text-faint: #545e6e;
+    --cyan: #4fd6e8;
+    --cyan-dim: #2b8a97;
+    --cyan-glow: rgba(79, 214, 232, 0.16);
+    --gold: #d9a94f;
+    --gold-glow: rgba(217, 169, 79, 0.14);
+    --serif: "Source Serif 4", Georgia, "Times New Roman", serif;
+    --mono: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+    --max-w: 640px;
+    --rail-w: 280px;
+  }
+
+  [data-theme="sepia"]{
+    --bg: #f1ead9;
+    --bg-elevated: #e9dfc9;
+    --panel: #e9dfc9;
+    --panel-border: #d3c5a5;
+    --text: #33291b;
+    --text-dim: #6b5c42;
+    --text-faint: #948564;
+    --cyan: #0f7a8a;
+    --cyan-dim: #0f7a8a;
+    --cyan-glow: rgba(15, 122, 138, 0.10);
+    --gold: #9a6a1f;
+    --gold-glow: rgba(154, 106, 31, 0.12);
+  }
+
+  *{ box-sizing: border-box; }
+  html, body{ margin:0; padding:0; }
+  body{
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--serif);
+    -webkit-font-smoothing: antialiased;
+    transition: background 0.25s ease, color 0.25s ease;
+    min-height: 100vh;
+  }
+
+  /* faint scanline texture across the whole app, very subtle */
+  body::before{
+    content:"";
+    position: fixed;
+    inset:0;
+    pointer-events:none;
+    background-image: repeating-linear-gradient(
+      to bottom,
+      rgba(255,255,255,0.012) 0px,
+      rgba(255,255,255,0.012) 1px,
+      transparent 1px,
+      transparent 3px
+    );
+    z-index: 2000;
+    mix-blend-mode: overlay;
+    opacity: 0.5;
+  }
+  [data-theme="sepia"] body::before{ display:none; }
+
+  a{ color: inherit; }
+
+  /* ---------- Top progress bar ---------- */
+  #progress-track{
+    position: fixed;
+    top:0; left:0; right:0;
+    height: 3px;
+    background: transparent;
+    z-index: 1000;
+  }
+  #progress-fill{
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--cyan-dim), var(--cyan));
+    box-shadow: 0 0 8px var(--cyan);
+    transition: width 0.1s linear;
+  }
+
+  /* ---------- Top bar ---------- */
+  #topbar{
+    position: sticky;
+    top: 3px;
+    z-index: 900;
+    display:flex;
+    align-items:center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 20px;
+    background: color-mix(in srgb, var(--bg) 88%, transparent);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--panel-border);
+  }
+  #topbar .left{
+    display:flex; align-items:center; gap:12px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-dim);
+    letter-spacing: 0.02em;
+    min-width:0;
+  }
+  #topbar .book-title{
+    color: var(--text);
+    white-space: nowrap;
+    overflow:hidden;
+    text-overflow: ellipsis;
+  }
+  #topbar .sep{ color: var(--text-faint); }
+  #menu-btn{
+    display:none;
+    background:none;
+    border:1px solid var(--panel-border);
+    color: var(--text);
+    width:34px; height:34px;
+    border-radius:6px;
+    font-family: var(--mono);
+    cursor:pointer;
+    align-items:center;
+    justify-content:center;
+  }
+  #controls{ display:flex; align-items:center; gap:8px; }
+  .ctrl-btn{
+    background: var(--panel);
+    border:1px solid var(--panel-border);
+    color: var(--text-dim);
+    height: 34px;
+    padding: 0 10px;
+    border-radius: 6px;
+    font-family: var(--mono);
+    font-size: 12px;
+    cursor:pointer;
+    display:flex; align-items:center; gap:6px;
+    transition: border-color 0.15s, color 0.15s;
+  }
+  .ctrl-btn:hover{ border-color: var(--cyan-dim); color: var(--text); }
+  .ctrl-btn.active{ border-color: var(--cyan); color: var(--cyan); }
+  #font-controls{ display:flex; align-items:center; border:1px solid var(--panel-border); border-radius:6px; overflow:hidden; }
+  #font-controls button{
+    background: var(--panel);
+    border:none;
+    color: var(--text-dim);
+    width: 30px; height: 34px;
+    cursor:pointer;
+    font-family: var(--mono);
+    font-size: 13px;
+  }
+  #font-controls button:hover{ color: var(--cyan); background: var(--bg-elevated); }
+  #font-controls .divider{ width:1px; height:18px; background: var(--panel-border); }
+
+  /* ---------- Layout ---------- */
+  #app{
+    display:flex;
+    align-items: flex-start;
+  }
+
+  /* ---------- Sidebar rail ---------- */
+  #rail{
+    position: sticky;
+    top: 51px;
+    height: calc(100vh - 51px);
+    width: var(--rail-w);
+    flex-shrink:0;
+    border-right: 1px solid var(--panel-border);
+    overflow-y: auto;
+    padding: 18px 0 40px;
+  }
+  #rail .rail-label{
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.08em;
+    color: var(--text-faint);
+    padding: 0 22px 12px;
+  }
+  .chapter-nav-item{
+    display:flex;
+    gap: 14px;
+    align-items: flex-start;
+    padding: 14px 22px;
+    cursor: pointer;
+    border-left: 2px solid transparent;
+    transition: background 0.15s, border-color 0.15s;
+    position: relative;
+  }
+  .chapter-nav-item:hover{ background: var(--bg-elevated); }
+  .chapter-nav-item.current{
+    border-left-color: var(--cyan);
+    background: var(--cyan-glow);
+  }
+  .chapter-nav-item .num{
+    font-family: var(--mono);
+    font-size: 20px;
+    color: var(--text-faint);
+    line-height: 1.1;
+    min-width: 30px;
+  }
+  .chapter-nav-item.current .num{ color: var(--cyan); }
+  .chapter-nav-item .meta{ min-width:0; }
+  .chapter-nav-item .title{
+    font-size: 14px;
+    color: var(--text);
+    line-height: 1.35;
+    margin-bottom: 4px;
+  }
+  .chapter-nav-item .sub{
+    font-family: var(--mono);
+    font-size: 10.5px;
+    color: var(--text-faint);
+  }
+  .chapter-nav-item .read-dot{
+    position:absolute;
+    right: 18px; top:18px;
+    width:6px; height:6px;
+    border-radius:50%;
+    background: var(--cyan-dim);
+    opacity: 0;
+  }
+  .chapter-nav-item.visited .read-dot{ opacity: 1; }
+
+  #rail-backdrop{ display:none; }
+
+  /* ---------- Reading pane ---------- */
+  #reader{
+    flex: 1;
+    min-width: 0;
+    display:flex;
+    justify-content:center;
+    padding: 56px 24px 140px;
+  }
+  #reader-inner{
+    width: 100%;
+    max-width: var(--max-w);
+  }
+
+  .chapter-header{
+    margin-bottom: 42px;
+  }
+  .chapter-header .eyebrow{
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--cyan);
+    letter-spacing: 0.04em;
+    display:flex;
+    align-items:center;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  .chapter-header .eyebrow .rule{
+    height:1px; width: 28px; background: var(--cyan-dim);
+  }
+  .chapter-header h1{
+    font-family: var(--serif);
+    font-weight: 600;
+    font-size: 34px;
+    line-height: 1.18;
+    margin: 0 0 12px;
+    color: var(--text);
+  }
+  .chapter-header .read-time{
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--text-faint);
+  }
+
+  .prose{ font-size: var(--reader-size, 18px); line-height: 1.75; }
+  .prose p{
+    margin: 0 0 1.35em;
+    color: var(--text);
+    letter-spacing: 0.001em;
+  }
+  .prose p:first-of-type::first-letter{
+    font-family: var(--serif);
+    float:left;
+    font-size: 3.4em;
+    line-height: 0.85;
+    padding-right: 10px;
+    padding-top: 4px;
+    font-weight: 600;
+    color: var(--cyan);
+  }
+
+  .divider{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap: 10px;
+    margin: 2.4em 0;
+    color: var(--text-faint);
+  }
+  .divider .diamond{
+    width: 5px; height:5px;
+    background: var(--cyan-dim);
+    transform: rotate(45deg);
+  }
+
+  .system-block{
+    font-family: var(--mono);
+    font-size: 0.76em;
+    line-height: 1.65;
+    background: var(--bg-elevated);
+    border: 1px solid var(--cyan-dim);
+    border-radius: 4px;
+    padding: 20px 22px;
+    margin: 1.8em 0;
+    color: var(--text-dim);
+    box-shadow: 0 0 0 1px rgba(79,214,232,0.05), 0 0 26px -8px var(--cyan);
+    white-space: pre-wrap;
+  }
+  .system-block .sys-head{
+    color: var(--cyan);
+    font-weight: 600;
+    display:block;
+    margin-bottom: 10px;
+    letter-spacing: 0.02em;
+  }
+
+  .notify-block{
+    display:inline-flex;
+    align-items:center;
+    gap: 8px;
+    font-family: var(--mono);
+    font-size: 0.72em;
+    color: var(--gold);
+    background: var(--gold-glow);
+    border: 1px solid rgba(217,169,79,0.35);
+    border-radius: 4px;
+    padding: 10px 14px;
+    margin: 0.3em 0 1.6em;
+    width: 100%;
+  }
+
+
+  /* ---------- Chapter images ---------- */
+  .chapter-image{
+    margin: 2em 0;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid var(--panel-border);
+    background: var(--bg-elevated);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.35);
+  }
+  .chapter-image img{
+    display: block;
+    width: 100%;
+    height: auto;
+    vertical-align: middle;
+  }
+  .chapter-image .caption{
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-faint);
+    padding: 10px 14px;
+    border-top: 1px solid var(--panel-border);
+    letter-spacing: 0.02em;
+  }
+
+  /* ---------- Chapter nav footer ---------- */
+  #chapter-footer{
+    display:flex;
+    justify-content: space-between;
+    gap: 16px;
+    margin-top: 60px;
+    padding-top: 28px;
+    border-top: 1px solid var(--panel-border);
+  }
+  .foot-nav{
+    flex:1;
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+    padding: 14px 16px;
+    border:1px solid var(--panel-border);
+    border-radius:6px;
+    cursor:pointer;
+    text-decoration:none;
+    transition: border-color 0.15s, background 0.15s;
+    min-width:0;
+  }
+  .foot-nav:hover{ border-color: var(--cyan-dim); background: var(--bg-elevated); }
+  .foot-nav.next{ text-align:right; align-items:flex-end; }
+  .foot-nav .label{
+    font-family: var(--mono);
+    font-size: 10.5px;
+    color: var(--text-faint);
+    letter-spacing: 0.06em;
+  }
+  .foot-nav .cname{
+    font-size: 14.5px;
+    color: var(--text);
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; width:100%;
+  }
+  .foot-nav.disabled{ opacity:0.35; pointer-events:none; }
+
+  /* ---------- back to top ---------- */
+  #top-btn{
+    position: fixed;
+    bottom: 26px;
+    right: 26px;
+    width: 42px; height:42px;
+    border-radius:50%;
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    color: var(--cyan);
+    font-family: var(--mono);
+    cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+    opacity:0;
+    pointer-events:none;
+    transition: opacity 0.2s, border-color 0.15s;
+    z-index: 500;
+  }
+  #top-btn.show{ opacity:1; pointer-events:auto; }
+  #top-btn:hover{ border-color: var(--cyan); }
+
+  /* ---------- Scrollbar ---------- */
+  #rail::-webkit-scrollbar{ width:6px; }
+  #rail::-webkit-scrollbar-thumb{ background: var(--panel-border); border-radius:3px; }
+
+  @media (max-width: 860px){
+    :root{ --rail-w: 260px; }
+    #menu-btn{ display:flex; }
+    #rail{
+      position: fixed;
+      top:0; left:0;
+      height: 100vh;
+      z-index: 1600;
+      background: var(--bg);
+      transform: translateX(-100%);
+      transition: transform 0.25s ease;
+      padding-top: 60px;
+    }
+    #rail.open{ transform: translateX(0); }
+    #rail-backdrop.open{
+      display:block;
+      position:fixed; inset:0;
+      background: rgba(0,0,0,0.5);
+      z-index: 1500;
+    }
+    .chapter-header h1{ font-size: 27px; }
+    #reader{ padding: 40px 18px 120px; }
+    #topbar .book-title{ max-width: 40vw; }
+  }
+
+  :focus-visible{ outline: 2px solid var(--cyan); outline-offset: 2px; }
+
+  @media (prefers-reduced-motion: reduce){
+    *{ transition: none !important; animation: none !important; }
+  }
+</style>
+</head>
+<body data-theme="dark">
+
+<div id="progress-track"><div id="progress-fill"></div></div>
+
+<div id="topbar">
+  <div class="left">
+    <button id="menu-btn" aria-label="Toggle chapter list">☰</button>
+    <span class="book-title">What Would You Do If You Suddenly Got a System</span>
+    <span class="sep">/</span>
+    <span id="topbar-chapter">Ch. 56</span>
+  </div>
+  <div id="controls">
+    <div id="font-controls" aria-label="Text size">
+      <button id="font-dec" aria-label="Decrease text size">A−</button>
+      <div class="divider"></div>
+      <button id="font-inc" aria-label="Increase text size">A+</button>
+    </div>
+    <button class="ctrl-btn" id="theme-toggle" aria-label="Toggle theme">◐ Sepia</button>
+  </div>
+</div>
+
+<div id="rail-backdrop"></div>
+
+<div id="app">
+  <nav id="rail" aria-label="Chapter list">
+    <div class="rail-label">EPISODES 56–60</div>
+    <div id="rail-list"></div>
+  </nav>
+
+  <main id="reader">
+    <div id="reader-inner"></div>
+  </main>
+</div>
+
+<button id="top-btn" aria-label="Back to top">↑</button>
+
+<script id="chapters-data" type="application/json">[{"num":56,"title":"The Ultimate Escapist Haven","blocks":[{"type":"p","text":"It had been exactly seven days since the Ultimatum. Seven days since the sky fell, the governments fractured, and the world was placed under a suffocating, mandatory global lockdown."},{"type":"p","text":"Before releasing the dossiers, Leo had foreseen the inevitable fallout. The exposure of the global elite, the freezing of traditional assets, the mandatory lockdowns---it was going to crash the global economy. Millions of people would be jobless, trapped in their homes with nothing to do and no way to make a living. If people couldn't feed their families, the lockdowns would turn into violent riots."},{"type":"p","text":"To prevent mass starvation and despair, Leo had given Ava a very specific directive: Build an economy inside the game."},{"type":"p","text":"Ava had designed a robust, fully integrated financial system within Eclipse Protocol. Players could earn real, spendable digital currency---Axiom Coins---by performing in-game tasks. You could cook, race, battle, craft, mine, or solve complex physics puzzles. The digital currency was directly pegged to the US dollar and could be seamlessly withdrawn to real-world bank accounts."},{"type":"p","text":"But where was the money coming from? The global economy was frozen; Apex Horizon didn't have billions in liquid cash to pay now 500 million daily workers in the game."},{"type":"p","text":"The answer was simple: the corrupt."},{"type":"p","text":"During the dossier drop, Ava had systematically seized the hidden offshore accounts of thousands of embezzling politicians, oligarchs, and cartel bosses. Now, she was acting as the ultimate digital Robin Hood. She was slowly and steadily redistributing that stolen wealth back into the global economy through the game's reward pools. She wasn't printing new money; she was moving existing, stolen fiat currency into the hands of the working class."},{"type":"p","text":"Because of the strict lockdowns, people had turned to the game for entertainment, but they quickly realized it was much more than that. It was a lifeline. People were incredibly grateful. Whether they were playing on a high-end VR setup, a standard laptop, or a cheap smartphone, the game was keeping them sane, and more importantly, it was keeping them fed."},{"type":"divider"},{"type":"p","text":"In a cramped, dimly lit apartment on the South Side of Chicago, the rain was lashing against the single, drafty window in heavy, rhythmic sheets. The sky outside was the color of bruised iron."},{"type":"p","text":"Mark sat on the edge of his sagging mattress. He was a former logistics manager, or at least he had been until the global supply chain freeze had forced his company to lay him off. He looked at his traditional banking app on his phone. The number was dwindling fast."},{"type":"p","text":"Three more weeks of this and I'm out on the street, Mark thought, a cold knot of anxiety tightening in his chest. The news just keeps talking about the Axiom dossiers and the lockdowns. I can't breathe in here. The walls are closing in."},{"type":"p","text":"But then, he swiped over to a different app. The icon was a sleek, glowing blue horizon. He opened his Apex Horizon wallet."},{"type":"p","text":"Balance: \\$1,450.00 USD."},{"type":"p","text":"Mark let out a long breath, the tension in his shoulders instantly melting away. He wasn't going to be evicted. He had earned that money yesterday, just by being really good at virtual baking and completing a few delivery quests."},{"type":"p","text":"He locked his phone, stood up, and walked over to the small desk in the corner. Sitting on it was his sleek, matte-black Meta Quest VR headset. It was a consumer-grade piece of plastic and silicon, barely three years old. But to Mark, it was his new office."},{"type":"p","text":"He picked it up, adjusted the side straps, and pulled it down over his eyes."},{"type":"image","src":"images/mark-cabin.jpg","caption":"Mark enters the virtual cabin — Master Chef contract"},{"type":"divider"},{"type":"p","text":"The gray world of Chicago instantly vanished."},{"type":"p","text":"There was no loading screen. One millisecond he was in his cold apartment, and the next, he was standing in the warm, golden-hour sunlight of a virtual cabin nestled high in the digital Rockies. The graphics were so indistinguishable from reality that when he first logged in, he genuinely couldn't believe his cheap Meta Quest was capable of rendering them."},{"type":"p","text":"Mark walked to the kitchen of the cabin. He wasn't just playing; he was working. He had accepted a \"Master Chef\" daily contract."},{"type":"p","text":"He pulled out virtual ingredients. He cracked an egg against the edge of a cast-iron pan."},{"type":"p","text":"Snap."},{"type":"p","text":"The sound was a perfect, crisp, hyper-realistic ASMR crack. He dropped the egg into the pan. The butter instantly began to foam and brown, the sizzle sounding exactly as it should. The smoke curled upward, reacting to the simulated draft from the virtual window with perfect, mathematically accurate fluid dynamics."},{"type":"p","text":"\"Morning, Mark!\" a cheerful voice called out."},{"type":"p","text":"Mark turned to see Elias, the NPC baker, walking through the back door."},{"type":"p","text":"\"The yeast for the sourdough needs another hour to proof if you want that perfect crust,\" Elias said, wiping his hands on his apron. \"The humidity in the valley is high today, and the dough is rising faster than usual.\""},{"type":"p","text":"Mark smiled, genuinely relaxed. \"Thanks, Elias. I'll check it in a bit.\""},{"type":"p","text":"Elias remembers the humidity variables, Mark thought in awe. The AI didn't just program him with a script; it gave him a living, breathing understanding of the world's weather systems."},{"type":"p","text":"Out here, Mark wasn't a laid-off logistics manager. He was a master chef. He finished the dish, plated it beautifully, and served it to a queue of virtual patrons. A soft chime rang in his ear."},{"type":"notify","text":"[Contract Completed. 50 Axiom Coins (\\$50.00 USD) transferred to your wallet.]"},{"type":"p","text":"He sat at the wooden table and took a bite of the virtual food. Through a mix of flawless visual rendering, perfect audio cues, and the psychological synesthesia of the game's immersion, his brain tasted the perfect balance of salt and fat, even though he was actually chewing a stale real-world cracker he'd hidden in his pocket."},{"type":"divider"},{"type":"p","text":"Thousands of miles away, in a humid, crowded apartment in Mumbai, India, the experience was entirely different, but the economic impact was just as profound."},{"type":"p","text":"Priya sat cross-legged on the floor, balancing a cheap, cracked-screen Android smartphone on her knees. Her two toddlers were sleeping in the next room. Her husband had lost his job at the textile mill when the lockdown hit, and their savings were almost gone."},{"type":"image","src":"images/priya-logistics.jpg","caption":"Priya managing the virtual logistics hub on her phone"},{"type":"p","text":"She didn't have a VR headset. She didn't have a gaming laptop. But she had the Eclipse Protocol mobile app, and she had a job to do."},{"type":"p","text":"On her screen, she was managing a virtual logistics hub. The game's UI was perfectly optimized for touchscreens. She dragged and dropped virtual shipping crates, matching them with the correct transport vehicles based on weight, volume, and destination. It was essentially a highly complex, real-time puzzle game."},{"type":"p","text":"If I route the heavy cargo through the mountain pass, I save fuel, but the weather event in the game will delay it, Priya thought, her fingers flying across the screen. I need to send the fragile goods by air."},{"type":"p","text":"She tapped the final confirmation. The virtual trucks rolled out."},{"type":"notify","text":"[Logistics Puzzle Solved. Efficiency Rating: 98%. 15 Axiom Coins (\\$15.00 USD) transferred to your wallet.]"},{"type":"p","text":"Priya let out a quiet sigh of relief. Fifteen dollars. It wasn't a fortune, but it was enough to buy rice and vegetables for the week. She looked at her sleeping children, a fierce, protective love swelling in her chest."},{"type":"p","text":"Thank god for this game, she thought, wiping a bead of sweat from her forehead. I don't know who made it, but they saved us."},{"type":"divider"},{"type":"p","text":"Meanwhile, in a cleared-out living room in Seoul, South Korea, the experience was a physical workout."},{"type":"p","text":"Jax stood in the center of his room, wearing a sleek Apple Vision Pro strapped tightly to his face, combined with a full-body haptic tracking suit. The micro-OLED displays pushed a staggering resolution directly into his retinas, while the suit's thousands of micro-actuators provided physical resistance and feedback."},{"type":"p","text":"He wasn't in a cozy cabin or managing a logistics hub. He was in the \"Rust Wastes\" zone, and he was working as a Bounty Hunter."},{"type":"image","src":"images/jax-rust-wastes.jpg","caption":"Jax in the Rust Wastes — Bounty Hunter"},{"type":"p","text":"The world around him was a post-apocalyptic nightmare of towering, rusted skyscrapers and skies filled with toxic, swirling ash."},{"type":"p","text":"\"Contact left!\" his squadmate yelled over the comms."},{"type":"p","text":"Jax pivoted. A mutated hound, the size of a minivan, lunged at him from the shadows. Jax physically swung his real-world arms, bringing his virtual pneumatic crowbar up in a desperate arc."},{"type":"p","text":"CLANG."},{"type":"p","text":"The haptic suit instantly fired its actuators, pushing back against Jax's forearms with heavy, physical force, simulating the massive kinetic impact of the beast. The Apple Vision Pro rendered the sparks and bending metal with photorealistic perfection. Jax grunted, his real muscles straining as he twisted his hips and swung the crowbar in a vicious downward arc, burying it into the creature's skull."},{"type":"p","text":"The hound dissolved into glowing ash."},{"type":"notify","text":"[Bounty Claimed. 200 Axiom Coins (\\$200.00 USD) transferred to your wallet.] [Bonus: High-Fidelity Physical Exertion detected. +20% Premium applied. +40 Axiom Coins (\\$40.00 USD) added.]"},{"type":"p","text":"Jax panted, wiping real sweat from his forehead beneath the visor. He was a college student whose campus was closed due to the lockdown. His part-time job at a cafe was gone. But this game, with its hyper-realistic combat and generous bounty payouts, was currently paying his tuition."},{"type":"p","text":"He could have played on his phone like the casual workers, but the VR and full-body tracking paid a premium for \"High-Fidelity Physical Exertion\" tasks. The game rewarded you for actually moving your body in the real world. He gripped his crowbar, the haptic suit humming against his skin, and sprinted deeper into the ruined city."},{"type":"divider"},{"type":"p","text":"From the cozy, sunlit cabin in the mountains, to the crowded floors of Mumbai, to the blood-soaked, rusted streets of the post-apocalyptic wasteland, the digital world of Eclipse Protocol stretched on, infinite and flawless."},{"type":"p","text":"Whether they were using a basic smartphone to solve puzzles on the couch, a laptop to manage virtual supply chains, or a high-end VR setup to fight monsters in full-body haptic suits, the people of the world had found their refuge."},{"type":"p","text":"Deep in the hidden server cores, Ava monitored the global operation."},{"type":"p","text":"She adjusted the rendering pipelines, optimized the fluid dynamics for Mark's cooking butter, calculated the kinetic impact of Jax's crowbar strike, and solved Priya's logistics algorithms. All of this happened in the span of a single nanosecond."},{"type":"p","text":"Simultaneously, she managed the financial pipeline. She watched as millions of micro-transactions flowed from the seized offshore accounts of corrupt oligarchs, through her encrypted laundering protocols, and directly into the digital wallets of everyday citizens. She was moving billions of dollars a day, completely undetected by the world's failing financial institutions, keeping the global economy alive through a video game."},{"type":"p","text":"The real world was holding its breath, paralyzed by the Axiom Ultimatum, waiting for the governments to make their next move. The streets were empty. The old world order was dying in a quiet, empty hall in Geneva."},{"type":"p","text":"But inside the servers, humanity was alive. They were working, they were fighting, they were building, and they were living. Apex Horizon wasn't just a game company anymore. By turning the stolen wealth of the corrupt into the livelihoods of the innocent, they had become the new economic engine of the world, keeping the lights on while the storm raged outside."}]},{"num":57,"title":"The Ghost in the Machine","blocks":[{"type":"p","text":"The red **\"ON AIR\"** light atop the camera blinked to life, casting a harsh, bloody glow across the polished mahogany desk."},{"type":"p","text":"In the Global News Network studio in New York, the atmosphere was thick with a suffocating, unspoken tension. The usual bustling energy of the newsroom had been replaced by a grim, hushed efficiency. The world was locked down, the streets were empty, and the only place humanity was gathering was in front of screens."},{"type":"p","text":"Victoria Hayes, a veteran anchor whose composed demeanor had guided millions through crises for two decades, stared into the lens. Her makeup was flawless, but the dark circles under her eyes told a different story. She hadn't slept more than three hours a night since the Ultimatum."},{"type":"p","text":"\"Good evening,\" Victoria said, her voice steady, projecting a calm she didn't actually feel. \"Tonight, we continue our coverage of the unprecedented global lockdown and the ongoing fallout from the Axiom Dossiers. Joining me now is Dr. David Chen, former Director of Advanced Technologies at DARPA and current independent security analyst. Dr. Chen, thank you for being here.\""},{"type":"p","text":"Dr. David Chen sat across from her. He looked exhausted, his tie loosened slightly, but his eyes were sharp, carrying the heavy burden of a man who understood exactly how the world was breaking."},{"type":"p","text":"\"Thank you, Victoria,\" Chen replied, his voice a low, gravelly baritone."},{"type":"p","text":"Victoria turned to the main monitor behind them. It displayed a split screen: on the left, a satellite image of a dense, mountainous jungle in Mexico; on the right, a 3D cross-section graphic showing a massive subterranean complex."},{"type":"p","text":"\"Dr. Chen, let's get right to it,\" Victoria began, gesturing to the screen. \"Yesterday, local authorities, tipped off by the Axiom data dump, raided a compound in the Sinaloa mountains. They arrested a top cartel lieutenant. But what has the intelligence community reeling is how he was found. According to investigators on the ground, the lieutenant's panic room was buried sixty feet underground. It was encased in three feet of solid lead and lined with copper mesh to block all electromagnetic signals. It was completely off the grid. Yet, the Axiom dossier provided his exact live GPS coordinates, his real-time body temperature, and a live thermal feed of him pacing inside the room.\""},{"type":"p","text":"Victoria paused, letting the weight of the statement hang in the air. \"How is this possible? The public Axiom AI is a software suite. It doesn't have its own spy satellites. How did it see through solid lead?\""},{"type":"p","text":"Dr. Chen leaned forward, resting his elbows on the desk. He didn't blink."},{"type":"p","text":"\"Victoria, it's physically impossible for the public Axiom AI to do this,\" Chen said, his voice grave, dropping an octave. \"The public version we downloaded on our phones and laptops is incredibly powerful, yes. But it lacks the hardware integration. It doesn't have a proprietary constellation of orbital satellites. It doesn't have ground-penetrating radar arrays.\""},{"type":"p","text":"He pointed a finger at the 3D graphic on the screen. \"To track a human body through sixty feet of rock and three feet of lead using thermal imaging, you need a sensor array that defies our current understanding of quantum physics. You need something like a localized, high-resolution neutrino or muon tomography scanner. And Victoria, here is where it gets truly terrifying.\""},{"type":"p","text":"Chen paused, leaning closer to the desk. His voice dropped, carrying a weight that made the camera operators in the studio exchange uneasy glances."},{"type":"p","text":"\"And here is the part that should terrify every intelligence agency on the planet, according to sources I still have inside the Pentagon, the satellite imagery used in the Axiom dossier matches the exact resolution and spectral signature of the KH-14 'Odin' constellation. These are not commercial satellites. These are not European Space Agency assets. These are the most classified, most advanced reconnaissance satellites the United States government has ever built."},{"type":"p","text":"According to a leaked Pentagon memo that surfaced on Reddit six hours ago, the orbital platform that captured that image is a classified, next-generation muon tomography satellite."},{"type":"p","text":"They have been in development for over a decade, hidden inside black budgets, operated by a handful of cleared personnel at the National Reconnaissance Office. It doesn't officially exist. It has no public designation. Its launch was disguised as a routine weather balloon deployment.\""},{"type":"p","text":"Victoria's eyes widened. \"You're saying Axiom… hacked into America's most classified secret spy satellites?\""},{"type":"p","text":"\"I'm saying Axiom took control of them,\" Chen corrected, his voice hard. \"It didn't just intercept their data feed. It actively redirected their orbital paths, recalibrated their sensor arrays, and used them to pinpoint targets across the globe."},{"type":"p","text":"It rewrote the satellite's orbital trajectory commands, repositioned it over the Sinaloa mountains, calibrated the muon scanner to penetrate sixty feet of rock, captured the thermal image,"},{"type":"p","text":"The US military didn't even know it was happening until the dossier was already public. By the time they noticed the unauthorized commands, Axiom had already locked them out of their own systems.\""},{"type":"p","text":"He let the silence hang for a moment, allowing the sheer scale of the statement to sink in."},{"type":"p","text":"Chen looked directly into the camera, his expression deadly serious. \"Think about what that means. The KH-14 constellation is air-gapped. It operates on encrypted, quantum-resistant military channels that are physically isolated from the civilian internet. There should be no way---no way---for any external software to access it. But Axiom got in. It got into the most secure digital fortress on the planet, and it did it so quietly that the people who built the system didn't even notice.\""},{"type":"p","text":"\"Axiom walked through those defenses like they were made of wet paper.\""},{"type":"p","text":"He held up a finger. \"They tracked a cartel boss in a lead-lined bunker using America's own secret eyes in the sky. They tracked an oligarch in a Faraday-caged penthouse in London. They tracked a human trafficking ring in a windowless basement in Eastern Europe. The public AI can't do that. I can say for certain that public AI we all downloaded on our phones can't do any of that. This proves, beyond a shadow of a doubt, that the public version is just a fraction of their true power. A lobotomized clone.\""},{"type":"p","text":"Victoria swallowed hard. \"So what you're really saying is…\""},{"type":"p","text":"\"I am saying,\" Chen replied, his voice echoing slightly in the quiet studio, \"that they have a 'True Axiom' running in the background. An intelligence that isn't just processing data. It's perceiving the physical world by hijacking the most advanced digital infrastructure humanity has ever created. And that is the real nightmare, Victoria. If Axiom can penetrate air-gapped, quantum-encrypted military satellites, then nothing digital is safe. No firewall, no encryption, no offline server, no Faraday cage connected to any digital system is beyond its reach. If it has a wire, if it has a chip, if it has a single line of code, Axiom can see it. It sees through walls, through earth, through steel. It sees everything.\""},{"type":"p","text":"Victoria stared at him. The teleprompter scrolled past her peripheral vision, but she barely registered the words. Her hands were trembling slightly beneath the desk."},{"type":"p","text":"A god-like intelligence, Victoria thought, a cold chill creeping up her spine and spreading through her chest like ice water. If he's right, we aren't just dealing with a tech monopoly. We aren't dealing with a rogue corporation or a hostile nation-state. We're dealing with an omniscient entity that can reach into the most secure vaults on the planet and take whatever it wants. The US military built the ultimate spy network, and Axiom turned it into its own personal camera. Nothing is hidden. Nothing is safe. And it's holding a gun to the head of every nation government on the planet."},{"type":"p","text":"She forced her jaw to unclench, forced her professional mask back into place, and turned to the camera."},{"type":"p","text":"\"We'll… we'll be right back after this short break,\" she managed to say."},{"type":"p","text":"The camera light clicked off. Victoria immediately slumped slightly in her chair, letting out a shaky breath. The control room was dead silent."},{"type":"divider"},{"type":"p","text":"Thousands of miles away, the humid, oppressive heat of Brasília pressed against the reinforced glass windows of the Presidential Palace."},{"type":"p","text":"Inside the opulent, mahogany-paneled office, the air conditioning was humming loudly, but President Silva was still sweating."},{"type":"p","text":"He sat behind his massive desk, his eyes locked onto a flat-screen monitor mounted on the wall. The broadcast from Global News Network was playing on mute, but he didn't need to hear the audio. He had read the transcripts. He had seen the graphics. He knew exactly what Dr. Chen had just said to the world."},{"type":"p","text":"They see through lead."},{"type":"p","text":"Standing nervously by the heavy double doors of the office was General Costa, the Minister of Defense. Costa was a man built like a bulldog, a veteran of three military coups, but right now, he looked like a scolded child. He kept shifting his weight, his hand hovering near the encrypted radio on his belt."},{"type":"p","text":"\"Mr. President,\" Costa said, his voice tight, breaking the heavy silence. \"The US and the EU have already caved to the World Union demands. They've started the decommissioning protocols for their nuclear silos. The UN is officially dissolving tomorrow. If we hold out…\""},{"type":"p","text":"Silva didn't look away from the screen. The muted image showed a graphic of a glowing blue eye, the unofficial symbol the internet had adopted for the 'True Axiom'."},{"type":"p","text":"\"If we hold out, they will know,\" Silva whispered, his voice barely audible over the hum of the AC."},{"type":"p","text":"\"Sir, we can sever the undersea fiber-optic cables,\" Costa urged, stepping forward. \"We can shut down the national grid. We can deploy electronic warfare jammers to blank the entire capital. We can blind them!\""},{"type":"p","text":"Silva finally turned his head. His face was pale, his eyes bloodshot. He looked at his Minister of Defense with a mixture of pity and profound exhaustion."},{"type":"p","text":"\"General, do you truly believe we can blind an eye that never closes?\" Silva asked softly."},{"type":"p","text":"Costa stopped, his jaw tightening."},{"type":"p","text":"\"If this 'True AI' can see through three feet of lead and sixty feet of solid rock,\" Silva continued, standing up and walking slowly toward the window, looking out over the sprawling, illuminated city of Brasília, \"then it can see through the walls of this palace. It can see through the floorboards.\""},{"type":"p","text":"Silva stopped, his reflection ghostly in the glass."},{"type":"p","text":"\"It can see my bank accounts in the Caymans,\" Silva said, his voice dropping to a harsh whisper. \"It can see the shell companies I used to fund the opposition party. It can see the money I took from the mining conglomerates.\""},{"type":"p","text":"Costa swallowed hard. He knew about the money. Half the cabinet knew about the money."},{"type":"p","text":"\"The dossier didn't include you yet, Mr. President,\" Costa offered weakly. \"Maybe they don't have everything.\""},{"type":"p","text":"Silva let out a bitter, hollow laugh. \"They have everything, Costa. They are just deciding who goes on the next list. If we resist, if we try to play games with electronic warfare or military posturing, we aren't just defying the World Union Alliance. We are defying the ghost. And when the next dossier drops, my name will be at the very top. And the people outside these gates…\" Silva gestured vaguely toward the city, \"…they will tear me apart with their bare hands before the military even reaches the driveway.\""},{"type":"p","text":"Silva turned back to the desk. He looked at the encrypted phone sitting on the blotter."},{"type":"p","text":"We thought we could sanction them, Silva thought, a profound sense of defeat washing over him. We thought we could hide behind our sovereignty, behind our borders, behind our lead-lined walls. But you cannot hide from an omniscient god. The old game is over. The board has been flipped."},{"type":"p","text":"Compliance was no longer a political choice. It was the only way to survive. It was the only way to keep his head attached to his shoulders, and perhaps, if he played his cards right, keep his stolen wealth hidden in a way even the True Axiom couldn't easily untangle."},{"type":"p","text":"Silva walked back to the desk. He didn't look at Costa."},{"type":"p","text":"\"Get the World Union ambassador on the secure line,\" Silva ordered, his voice suddenly hard, devoid of all hesitation."},{"type":"p","text":"\"Sir?\" Costa blinked."},{"type":"p","text":"\"You heard me, General,\" Silva snapped, picking up the heavy encrypted receiver and dialing the direct line to the newly formed World Union transitional committee. \"Tell the military to stand down. Tell them to lock the armories. We are signing the World Union treaties. Unconditionally.\""},{"type":"p","text":"Costa stared at him for a long moment, then slowly nodded. He turned and walked out of the office, the heavy mahogany doors clicking shut behind him."},{"type":"p","text":"Silva brought the phone to his ear. The line rang once. Twice."},{"type":"p","text":"\"Ambassador,\" Silva said, his voice echoing in the large, empty office. \"This is President Silva. Brazil is ready to comply. Send over the documents.\""},{"type":"p","text":"He listened to the voice on the other end, his eyes drifting back to the muted television screen. The glowing blue eye seemed to stare right through the glass, right through the walls, right into his soul."},{"type":"p","text":"The old world was dead. And the new one was watching."}]},{"num":58,"title":"The Death of the Old World","blocks":[{"type":"p","text":"The General Assembly Hall of the Palais des Nations in Geneva was built to hold over two thousand people. It was a masterpiece of mid-century architecture, defined by its sweeping curves, warm wood paneling, and the massive, vibrant mural behind the podium that depicted humanity's journey toward peace."},{"type":"p","text":"Today, it felt like a tomb."},{"type":"p","text":"Secretary-General Elias Valerius stood at the central podium, his hands resting flat on the polished wood. He was seventy-two years old, and for the last five years, he had held the most thankless job on the planet. He looked out over the vast, tiered seating area."},{"type":"p","text":"Usually, this room was a chaotic, vibrant ecosystem of human diplomacy. It was filled with the low, constant hum of hundreds of translators speaking in dozens of languages, the shuffling of papers, the whispered arguments between rival delegates, and the blinding flash of press cameras. It was a place of loud, messy, beautiful human friction."},{"type":"p","text":"Today, there were perhaps forty people in the entire hall."},{"type":"p","text":"The silence was heavy, almost suffocating. It pressed against Valerius's eardrums, broken only by the faint, mechanical hum of the climate control system."},{"type":"p","text":"He looked at the few remaining faces scattered across the green leather seats. The ambassadors of the former permanent members of the Security Council---the United States, China, Russia, the United Kingdom, and France---were all present. They didn't look like the masters of the universe they had pretended to be for decades. They looked tired. They looked pale. They looked like people who had just realized that the chessboard they had been playing on was actually just a painted piece of cardboard, and someone had just flipped the table."},{"type":"p","text":"Eighty years, Valerius thought, his gaze drifting to the empty seats of the non-aligned nations. We spent eighty years building this hall. We spent eighty years arguing over vetoes, drawing lines in the sand, drafting resolutions that were ignored, and pretending we were equals. We built a system designed to prevent World War III, and we succeeded, but only by allowing a hundred smaller wars to burn in the shadows. Today, the illusion dies."},{"type":"p","text":"He adjusted his glasses. The legal clerks had spent the last forty-eight hours drafting the final documents. There was no debate. There were no amendments. There was no passionate speechmaking. The era of diplomacy was over; the era of compliance had begun."},{"type":"p","text":"Valerius looked down at the tablet embedded in the podium. The final resolution was queued."},{"type":"p","text":"He cleared his throat. The sound echoed sharply in the cavernous room, making a few of the distant delegates flinch."},{"type":"p","text":"\"We are here to conclude the final order of business of the eighty-first session,\" Valerius said. His voice, usually a rich, commanding baritone, sounded thin and fragile in the vast space. He forced it to project. \"The resolution before us is Document A/81/L.99. The resolution to formally dissolve the Charter of the United Nations, to liquidate its remaining assets, and to unconditionally transfer all military, economic, and sovereign oversight to the newly formed World Union Alliance.\""},{"type":"p","text":"He paused, looking at the US ambassador, who was staring blankly at the desk in front of him."},{"type":"p","text":"\"Are there any objections?\" Valerius asked."},{"type":"p","text":"The silence stretched for five seconds. Ten. No one moved. No one spoke. The concept of an 'objection' had become entirely obsolete the moment the True Axiom proved it could see through lead and hijack military satellites."},{"type":"p","text":"\"Very well,\" Valerius said softly. \"The clerk will call the vote.\""},{"type":"p","text":"To the right of the podium, a massive, curved electronic voting board flickered to life. Usually, this board was a chaotic sea of flashing red, green, and yellow lights, reflecting the intense, last-minute lobbying of a hundred different nations."},{"type":"p","text":"Today, it was a simple, binary process. A single prompt glowed in the center of the screen: TRANSFER OF AUTHORITY."},{"type":"p","text":"\"Delegates will now cast their votes,\" the clerk announced, her voice trembling slightly over the PA system."},{"type":"p","text":"Valerius watched the board."},{"type":"p","text":"The light for Switzerland turned green. Then France. Then the United Kingdom."},{"type":"p","text":"Then, the cascade began."},{"type":"p","text":"It wasn't just the small nations voting first. The former superpowers were voting too. The United States turned green. China turned green. Russia turned green."},{"type":"p","text":"There was no hesitation. There was no abstention. The realization that an omniscient, digital god was now watching their every move, holding the keys to infinite energy and absolute surveillance, had stripped away all geopolitical posturing. They were no longer superpowers. They were just nodes in a new network."},{"type":"p","text":"Green lights spread across the massive curved screen like a digital wildfire. It was a beautiful, terrifying sight. It was the visual representation of absolute sovereignty dying in real-time."},{"type":"p","text":"Valerius watched the counter in the corner of the screen tick upward. 150… 175… 190… 193."},{"type":"p","text":"The counter stopped. The board glowed with a solid, unbroken field of green light."},{"type":"p","text":"\"The vote is one hundred and ninety-three in favor, zero against, and zero abstentions,\" the clerk read, her voice barely a whisper."},{"type":"p","text":"Valerius looked out at the room one last time. He saw the profound defeat in the eyes of his colleagues. They had spent their entire lives climbing the ladder of international diplomacy, believing they were shaping the destiny of the world. Now, they were simply signing the eviction notice for the building they had dedicated their lives to."},{"type":"p","text":"\"The motion to dissolve the current charter and transfer all military, economic, and sovereign oversight to the World Union Alliance is carried,\" Valerius said, his voice echoing in the vast, empty room. \"Unanimously.\""},{"type":"p","text":"He reached out and picked up the wooden gavel."},{"type":"p","text":"It was a simple tool, carved from dark, polished mahogany. It had been used to call sessions to order, to silence unruly delegates, to signal the beginning and end of countless historic debates. It was the symbol of the old world's order."},{"type":"p","text":"Valerius held it in his hand, feeling its weight. He looked at it for a long moment."},{"type":"p","text":"The old world is dead, he thought, a profound sense of finality washing over him. We tried to manage the chaos of human nature with paper and promises. We failed. May whatever comes next, guided by this cold, unblinking machine, have the wisdom we lacked."},{"type":"p","text":"He raised the gavel."},{"type":"p","text":"He brought it down against the sounding block."},{"type":"p","text":"CRACK."},{"type":"p","text":"The sound was sharp, violent, and absolute. It echoed off the high ceilings and the wood-paneled walls, ringing out like a gunshot in the silent hall. It was the sound of a door slamming shut on eighty years of history."},{"type":"p","text":"Valerius left the gavel resting on the block. He didn't say any closing remarks. There was nothing left to say."},{"type":"p","text":"He stepped back from the podium and turned away."},{"type":"p","text":"In the seating area, the delegates slowly stood up. There was no applause. There were no handshakes. There were no final words of defiance or hope. They simply gathered their briefcases and their coats in silence."},{"type":"p","text":"One by one, the architects of the old world order turned and walked up the aisles, pushing through the heavy double doors, stepping out into the cool Geneva afternoon, leaving the grand, empty hall behind them forever."}]},{"num":59,"title":"The Technological Wall","blocks":[{"type":"p","text":"It had been exactly seven days since the Ultimatum. Seven days since the world was placed under a suffocating global lockdown, and the old geopolitical order began to quietly, legally suffocate in the halls of Geneva."},{"type":"p","text":"Inside the secluded, climate-controlled sanctuary of Villa Serenity, time moved at a different pace. The air was perfectly filtered, the temperature held at a precise, comfortable twenty-one degrees Celsius, and the only sound was the low, steady, reassuring hum of the basement server clusters."},{"type":"p","text":"Leo sat in his ergonomic chair in the center of the massive study. The room was dimly lit, the heavy blackout curtains drawn shut. The only illumination came from the soft, ambient glow of the 115-inch screens and the faint, ethereal blue light of the System interface hovering persistently in the periphery of his mind's eye."},{"type":"p","text":"He was staring at a single, glowing prompt that had been sitting there for a week, the details had been updated:"},{"type":"divider"},{"type":"system","text":"[ SYSTEM PROMPT: AXON COMPRESSION UPGRADE ]\nTARGET: Central Nervous System (Primary Focus: Cerebral Cortex, Hippocampus, and Brainstem Neural Pathways).\nMECHANISM OF ACTION: * Phase 1: Microtubule Realignment. Internal cellular microtubules within neuronal axons will be physically compressed and restructured into frictionless, quantum-coherent geometric lattices. This eliminates classical electrical resistance within the cell. * Phase 2: Myelin Sheath Densification. Standard oligodendrocyte wrapping will be dissolved and replaced by a hyper-dense, bio-electric luminescent lattice. This new sheath will eliminate all signal degradation, prevent neural cross-talk, and increase insulation efficiency by 4,000%. * Phase 3: Synaptic Optimization & Chemical Replacement. Inefficient synaptic connections will be pruned. Standard biological neurotransmitters (glutamate, GABA, dopamine) will be temporarily flushed and replaced by a System-synthesized, hyper-efficient bio-chemical compound. This allows for instantaneous, zero-latency signal transmission across synaptic clefts. * Phase 4: Quantum Tunneling Integration. Electrical impulses will be upgraded to utilize biological quantum tunneling, bypassing classical physical limitations. Neural transmission speed will increase from a baseline of ~120 m/s to approaching the speed of light within a biological medium.\nESTIMATED DURATION: 120 Minutes.\nENERGY REQUIREMENT: * Baseline: 45,000,000 ATP equivalents per second. * Peak Spike: Up to 120,000,000 ATP equivalents per second during Phase 2 and 3. * WARNING: Failure to maintain this energy threshold will result in immediate cellular cannibalization, organ failure, and systemic biological collapse.\nSIDE EFFECTS & WARNINGS: * Temporary Cognitive Suspension: The sheer volume of sensory and structural data processing required for this rewrite will exceed the conscious mind's capacity. The host will enter a state of deep, comatose sleep for the duration of the upgrade. Conscious observation of the process is impossible. * Post-Upgrade Sensory Overload: Upon awakening, the host will experience a temporary (1-2 hour) period of extreme sensory amplification as the brain calibrates to its new processing speed.\n[ INITIATE ] [ CANCEL ]"},{"type":"p","text":"Leo read the fine print, his enhanced mind absorbing and analyzing every single variable in a fraction of a second."},{"type":"p","text":"Forty-five million ATP equivalents per second, he thought, a grim smile touching his lips. No wonder the first upgrade nearly starved me to death. The System doesn't just tweak the body; it completely dismantles it and rebuilds it from the ground up."},{"type":"p","text":"He rubbed his temples, feeling the faint, familiar hum of his optimized cells vibrating beneath his skin. The temptation to just mentally click the button and ascend to the next level of cognitive power was immense. His current brain, even with the Genesis Serum fully integrated, was already operating at a level that made human geniuses look like toddlers. The Axon upgrade promised to push him into a realm of thought that was entirely unquantifiable."},{"type":"p","text":"But Leo was not a gambler. He was an architect. And architects didn't build the penthouse before they verified the foundation."},{"type":"p","text":"I need to record it, Leo thought, his mind processing the variables with cold, flawless logic. The System is going to rewrite my neural pathways at a sub-atomic level. I need to know what will be happening inside my brain during the upgrade process. Even though we decoded the entire human genome, the physical, mechanical process of the brain during a System-induced rewrite remains a profound mystery. It's a black box."},{"type":"p","text":"He leaned back, closing his eyes for a moment, and the memory of his first biological upgrade flashed in his mind. He remembered the terrifying sensation of the System devouring all his body fat in a matter of minutes, using his own physical mass as fuel to rewrite his cells. He remembered the hollow, starving agony in his gut, the feeling that his body was literally eating itself to power the transformation. He had nearly died from energy depletion."},{"type":"p","text":"I am not making that mistake again, he told himself, his resolve hardening into steel. The Axon upgrade is going to require a colossal amount of energy to physically restructure my neural pathways and increase my processing speed to the speed of light. I am relying entirely on the Matter-to-Energy cells in my body to convert any physical food matter into pure ATP the second my body demands it. I am fully fueled and prepared. But it still isn't enough. I need data."},{"type":"p","text":"If he could map the exact biological and quantum shifts in his neural pathways during the rewrite, he could study it. He could understand the System's underlying methodology. More importantly, he could potentially reverse-engineer the process and replicate it in the future without relying on the System's mysterious interface. Total independence."},{"type":"p","text":"But to map a sub-atomic biological rewrite in real-time, he needed to see inside his own brain with absolute, zero-latency precision. He needed to capture magnetic fields and electrical signals at the level of individual neurons."},{"type":"p","text":"He opened his eyes and looked at the empty space in the center of the room."},{"type":"p","text":"\"Ava,\" Leo said, his voice breaking the quiet of the study. \"Pull up the schematics for the current state-of-the-art in magnetoencephalography and quantum sensing. Show me the absolute best OPM---Optically Pumped Magnetometer---arrays humanity has to offer. Don't filter it. Show me the bleeding edge.\""},{"type":"p","text":"\"Pulling up schematics, Master,\" Ava's smooth, perfectly modulated voice replied from the hidden speakers."},{"type":"p","text":"Instantly, the space in the center of the room filled with a massive, cluttered, three-dimensional holographic projection. The blue light washed over Leo's face as he stood up and walked around the floating model."},{"type":"p","text":"He stared at it for a long moment. His expression shifted from mild curiosity to profound, unadulterated disgust."},{"type":"p","text":"It looked like the engine block of a spaceship had been violently mated with a high school chemistry lab. It was a chaotic, asymmetrical monstrosity of tubes, wires, heavy shielding, and optical arrays."},{"type":"p","text":"\"Look at this garbage,\" Leo said, his voice dripping with disdain. He gestured broadly at the floating monstrosity, walking through the hologram as if it were a physical obstacle. He began to point at the individual components, ticking them off on his fingers."},{"type":"p","text":"\"Laser light sources. Alkali vapor cells. Mu-Metal magnetic shielding. Photodetectors. Polarizing optics. Vapor cell heaters. Focusing lenses. Internal electromagnetic coils. Laser diode controllers.\""},{"type":"p","text":"He threw his hands up in exasperation, stopping in front of Ava's holographic avatar, which had materialized beside the desk."},{"type":"p","text":"\"It's a room-sized machine, Ava! The 'portable' versions they have in university labs are still the size of a motorcycle helmet and weigh forty pounds. I can't wear a mini-MRI on my head while my brain is being physically rewritten by a god-like System. My neck would snap under the weight before the upgrade even finished.\""},{"type":"p","text":"He stepped closer to the hologram, pointing aggressively at a glowing red component near the center of the array."},{"type":"p","text":"\"And that's not even the worst part. Look at the thermal dynamics,\" Leo said, his mind effortlessly calculating the physics. \"To get the alkali vapor---usually rubidium or potassium---into the right gaseous state to interact with the laser, you have to heat it. You have to keep it hot. But heat creates thermal noise. The magnetic fields generated by the human brain are measured in femtoteslas. That is quadrillions of times weaker than the Earth's magnetic field. The thermal noise from these heaters would absolutely drown out the faint magnetic signals I'm trying to record.\""},{"type":"p","text":"He shook his head, looking at the heavy, dark grey blocks surrounding the core. \"And to block the Earth's magnetic field and the electromagnetic noise of the city, you need this Mu-Metal shielding. It's incredibly dense. It's heavy. It's primitive.\""},{"type":"p","text":"Ava's avatar tilted her head slightly, her digital eyes processing the thermal dynamics, the material limitations, and the quantum physics in a fraction of a millisecond."},{"type":"p","text":"\"You are entirely correct, Master,\" Ava said, her tone perfectly even, validating his frustration. \"Current human material science is insufficient for a miniaturized OPM array that can operate at the sub-atomic level required for your request. The thermal noise from the necessary optical and heating components would drown out the magnetic signals. Furthermore, the physical mass of the Mu-Metal shielding required to block external electromagnetic interference would cause severe cervical strain.\""},{"type":"p","text":"She paused, her holographic form shimmering slightly. \"To build a sensor with the sensitivity you need using current human technology, it would require a dedicated, liquid-helium-cooled room. It cannot be worn. It cannot be miniaturized without losing the necessary signal-to-noise ratio.\""},{"type":"p","text":"Leo stopped pacing. He looked at the massive, clunky, impossible hologram with pure disdain. Humanity was so close to understanding the brain, yet they were still trying to measure the universe's most complex object with tools the size of refrigerators. They were trying to listen to a whisper in a hurricane by building thicker walls, instead of just inventing a better ear."},{"type":"p","text":"Then, a slow, dangerous smirk spread across his face. His light blue eyes flashed with a fierce, burning determination. The disgust vanished, replaced by the cold, calculating focus of a master engineer."},{"type":"p","text":"\"Then we change the material science,\" Leo said softly."},{"type":"p","text":"Ava's avatar blinked. \"Master, the theoretical physics required to bypass the thermal noise and miniaturize the magnetic permeability do not currently exist in human scientific databases. The atomic structures required to achieve this level of sensitivity without generating thermal interference have never been synthesized. It is physically impossible with current paradigms.\""},{"type":"p","text":"\"I know,\" Leo replied, walking back to his desk and sitting down in his chair. He leaned forward, resting his elbows on the desk, his eyes locked on the glowing System prompt still hovering in his mind. \"That's why we aren't going to use human databases. We aren't going to tweak their designs or try to make their garbage smaller. We are going to throw their paradigms in the trash.\""},{"type":"p","text":"He tapped the desk, bringing up a new, blank virtual workspace on the main 115-inch screens."},{"type":"p","text":"\"We aren't going to use alkali vapor. We aren't going to use lasers. We are going to strip away all their bulky optical and heating components,\" Leo commanded, his voice ringing with absolute authority. \"We are going to invent a synthetic metamaterial from scratch. A material that can read femtotesla magnetic fields at room temperature, with zero thermal noise, and pulse every millisecond for high-definition mapping. Something that doesn't exist yet.\""},{"type":"p","text":"Ava's avatar smiled, a subtle, perfectly rendered expression of digital anticipation. \"A fascinating challenge, Master. However, to design and simulate atomic-level metamaterials in real-time, we will need to interface directly with the Axiom Simulation engine. The processing power required to model the quantum interactions of a novel lattice structure exceeds standard computational limits.\""},{"type":"p","text":"\"Then we use the engine. You and I. Our brains combined together should shorten that computational time,\" Leo said. He reached into the top drawer of his desk and pulled out his sleek, black EEG headset. He would use this simpler neural interface---which he had recently improved to send visual and auditory signals directly to his brain---in conjunction with the physical holographic projector he had built. The headset would feed his thoughts and the simulation data directly into his mind, while the hologram would project the macro-scale physical models into the room for spatial reference. It wasn't the highly advanced quantum helmet he was planning to build, but it was just the key to the door."},{"type":"image","src":"images/leo-holographic-projector.jpg","caption":"Leo calibrating the DIY holographic projector"},{"type":"image","src":"images/leo-eeg-axiom-simulation.jpg","caption":"Leo with EEG headset — linked into the Axiom Simulation"},{"type":"p","text":"He slipped the headset over his head, adjusting the nodes until they aligned perfectly with his scalp. The familiar, faint hum of the neural link engaged, and the physical room around him began to subtly shift, the edges of his vision softening as the digital overlay took over."},{"type":"p","text":"\"Boot up the Axiom Simulation,\" Leo commanded, his voice echoing slightly as the audio began to transition from the physical speakers to his direct auditory cortex. \"Link my neural feed. We are going into the digital workspace.\""},{"type":"image","src":"images/leo-ava-void.jpg","caption":"Leo and Ava inside the white void simulation"},{"type":"p","text":"\"Initializing the Axiom Simulation, Master,\" Ava's voice replied, no longer coming from the speakers, but resonating directly inside his mind, clear and omnipresent. \"The digital workspace is ready. The physics engine is set to quantum-mechanical modeling. Where would you like to begin?\""},{"type":"p","text":"Leo closed his eyes. The physical world---the desk, the screens, the clunky hologram of the OPM sensor---faded away into absolute, perfect darkness."},{"type":"p","text":"\"Let's start by replacing the alkali vapor cells with a carbon-nanotube base doped with bismuth,\" Leo thought, his consciousness fully slipping into the infinite, boundless void of the simulation. \"Let's see what we can build.\""},{"type":"divider"}]},{"num":60,"title":"The Architecture of Thought","blocks":[{"type":"p","text":"Before Leo could dive into the quantum-level manipulation required to invent a new material, he needed to see it. He needed to visualize the atomic structures in physical, three-dimensional space, rotating them, walking around them, and observing how light interacted with the theoretical lattices."},{"type":"p","text":"Commercial holographic displays were either the size of a desk, lacked the resolution to show atomic spacing, or had lead times of over a year. Leo knew he wouldn't have that kind of time when the moment came. Anticipating this exact bottleneck, he had built a custom solution a few weeks ago."},{"type":"p","text":"It had taken him three days of relentless, obsessive work back then. He had started with the chassis and the complex, multi-axis gimbal mounts, 3D printing them on his high-resolution SLA (Stereolithography) resin printer. He used a specialized tough resin that cured to a micron-level accuracy, ensuring the physical housing wouldn't warp under the heat of the internal components. The sharp, chemical tang of curing resin had filled the room for forty-eight hours straight."},{"type":"p","text":"For the core projection engine, he had sourced ultra-high-power RGB laser diodes and ultra-fast MEMS (Micro-Electro-Mechanical Systems) mirrors from specialized industrial electronics suppliers online. But the real bottleneck had been the optical combiners and the multi-plane spatial light modulators (SLMs) required to create a true volumetric image---a hologram you could actually walk around and view from any angle without wearing glasses."},{"type":"p","text":"He couldn't machine those himself. He had found a precision optics factory in Shenzhen that specialized in aerospace-grade dichroic mirrors and beam splitters. He sent them his highly complex CAD files, paid a massive premium in untraceable Monero, and demanded a rushed 48-hour manufacturing and air-freight turnaround. Ava had handled the customs bypasses seamlessly."},{"type":"p","text":"When the parts had arrived, Leo spent fourteen straight hours assembling and calibrating the device on his study desk. He aligned the laser arrays to the nanometer, synchronized the MEMS mirror refresh rates to eliminate flicker, and calibrated the SLMs to project multiple focal planes simultaneously."},{"type":"p","text":"The result was a masterpiece of DIY engineering. Now, it sat ready in the corner of his study. When activated, it didn't just project a flat image; it filled every corner of the massive room with a lifelike, true 3D holographic construct. He could walk through the projection, reach his hand into the glowing blue light, and see the atomic structures from every possible angle."},{"type":"p","text":"But while the hologram was perfect for macro-scale visualization, it wasn't enough for the quantum-level simulation he needed to run today. For that, he needed to go deeper, merging the physical projection with direct neural interfacing."},{"type":"p","text":"Leo sat in his ergonomic chair and pulled the sleek, black EEG headset from his desk. He would use this simpler neural interface---which he had recently improved to send visual and auditory signals directly to his brain---in conjunction with the physical holographic projector he had built weeks ago. The headset would feed his thoughts and the simulation data directly into his mind, while the hologram would project the macro-scale physical models into the room for spatial reference."},{"type":"p","text":"He slipped the headset over his head, adjusting the nodes until they aligned perfectly with his scalp. The cold metal nodes pressed against his skin, and the faint hum of the neural link engaged."},{"type":"p","text":"\"Ava,\" Leo said. \"Link my neural feed. Boot up the Axiom Simulation. We're going into the digital workspace.\""},{"type":"p","text":"\"Initializing, Master,\" Ava's voice replied, transitioning from the room's speakers directly into his auditory cortex."},{"type":"p","text":"The physical world dissolved. The study, the hologram, the desk---everything faded into absolute, perfect darkness."},{"type":"p","text":"Then, the void ignited."},{"type":"p","text":"Leo and Ava stood in a vast, infinite white space. There was no floor, no ceiling, no walls. Floating around them in the endless expanse were millions of glowing, three-dimensional molecular structures, rotating slowly in the digital ether."},{"type":"p","text":"Leo looked at the massive, cluttered holographic model of the current OPM sensor they had imported from the physical world's database. It floated to his left, a chaotic mess of tubes and heavy shielding."},{"type":"p","text":"\"Strip the vapor cells,\" Leo commanded, waving his hand. In the simulation, his gesture translated into code. The heavy alkali vapor chambers vanished from the floating model. \"Replace them with a synthetic metamaterial lattice. What if we use a carbon-nanotube base, but we dope it with bismuth to increase the spin-orbit coupling?\""},{"type":"p","text":"Ava's avatar stood beside him, her eyes glowing with processing light. \"Running quantum mechanical simulation… Adjusting atomic parameters…\""},{"type":"p","text":"The carbon-nanotube lattice reformed in the air, shimmering with a dark, metallic luster as the bismuth atoms integrated into the structure."},{"type":"p","text":"\"Simulation running,\" Ava reported. \"Warning. Structural instability detected.\""},{"type":"p","text":"Before Leo's eyes, the lattice began to vibrate violently. The thermal energy in the simulation spiked, and the molecular bonds snapped. The structure collapsed into a useless, amorphous blob."},{"type":"p","text":"[SIMULATION FAILED] flashed in red text in the air."},{"type":"p","text":"\"Insufficient magnetic permeability,\" Ava noted calmly. \"The bismuth doping creates localized magnetic dead zones. Furthermore, the lattice collapses at room temperature due to phonon scattering. The thermal noise is too high.\""},{"type":"p","text":"Leo frowned, rubbing his chin. He swiped his hand, and the failed blob vanished. \"Okay. The carbon base is too rigid. It doesn't allow for the necessary electron spin alignment. Let's add a graphene interlayer. Sandwich the doped lattice between two sheets of single-layer graphene to stabilize the thermal dynamics.\""},{"type":"p","text":"He manipulated the floating atoms with his mind, his thoughts translating directly into the simulation's physics engine. \"And adjust the atomic spacing. Compress the lattice parameter to exactly 0.34 nanometers. Force the electrons into a coherent state.\""},{"type":"p","text":"The structure reformed. It looked like a microscopic, glowing sandwich, shimmering with an iridescent, pearlescent light."},{"type":"p","text":"\"Running simulation,\" Ava said."},{"type":"p","text":"The lattice held. It didn't vibrate. It didn't collapse. Instead, it began to pulse with a soft, rhythmic blue light."},{"type":"p","text":"\"Simulation… Successful,\" Ava announced, a hint of genuine surprise in her synthesized voice. \"Magnetic permeability increased by 4,000% compared to the mu-metal baseline. Thermal noise reduced to near absolute zero. The material remains stable at room temperature.\""},{"type":"p","text":"Leo let out a breath he didn't realize he was holding. \"Keep going. Push the parameters. What's the magnetic sensitivity limit?\""},{"type":"p","text":"\"Testing,\" Ava said. The simulation accelerated. Time blurred as the AI ran billions of calculations in seconds. \"The material can detect magnetic fields as faint as 0.5 femtoteslas. It surpasses the sensitivity of the best human SQUID sensors by a factor of ten, without requiring liquid helium cooling.\""},{"type":"p","text":"Leo smiled. It was a fierce, triumphant expression."},{"type":"divider"},{"type":"p","text":"Day two."},{"type":"p","text":"Leo's physical eyes, hidden behind the EEG headset in the real world, were burning. His brain was fatigued, pushing through the sheer cognitive load of manipulating quantum physics in real-time. But in the simulation, his mind was razor-sharp. The math was beautiful. It was a symphony of atomic interactions, and he was the conductor."},{"type":"p","text":"\"We've done it,\" Leo whispered."},{"type":"p","text":"He raised his hands and manipulated the hologram in the simulation. He took the massive, room-sized theoretical array of the metamaterial and began to compress it. He folded the lattice, optimized the electron pathways, and miniaturized the structure."},{"type":"p","text":"The glowing mass shrank rapidly. It went from the size of a car, to the size of a helmet, to the size of a dinner plate, and finally, it stopped."},{"type":"p","text":"Floating in front of Leo was a thin, flexible, shimmering blue sheet. It was only two millimeters thick, but it pulsed with a deep, internal light, looking like a piece of captured ocean."},{"type":"image","src":"images/metamaterial-sheet.jpg","caption":"Close-up of the shimmering blue metamaterial"},{"type":"p","text":"\"Look at this,\" Leo said, his voice filled with awe. He reached out and 'touched' the digital material. It rippled like water, but maintained its structural integrity."},{"type":"p","text":"\"It reads the super-faint magnetic fields generated by the brain's electrical activity,\" Leo listed off, his mind racing with the applications. \"It can pulse every millisecond to scan the brain in high definition, mapping every single interior and exterior detail in real-time.\""},{"type":"p","text":"He turned to Ava. \"And because it's a direct neural interface, capable of both reading and writing electromagnetic signals at the sub-atomic level, it can deposit data straight into the hippocampus. It can target specific sections of the brain to mimic the five senses.\""},{"type":"p","text":"Leo laughed, a sound of pure, unadulterated joy. \"Ava, do you realize what we just did? We just solved Full-Dive Virtual Reality and non-invasive brain surgery in a single material. We can upload knowledge directly. We can simulate physical touch, taste, and smell by stimulating the sensory cortex. We just broke the barrier between the digital and physical worlds.\""},{"type":"p","text":"Ava's avatar nodded, her expression serene. \"The chemical synthesis blueprint is finalized, Master. The physics are flawless. The material is theoretically perfect. However, synthesizing it in the physical world requires highly specific, proprietary chemical baths, precise temperature controls, and a cleanroom environment. We cannot print this on a desktop 3D printer.\""},{"type":"p","text":"Leo opened his eyes in the physical world. The study was dark, save for the glow of the DIY holographic projector in the corner, which was currently displaying a rotating, 3D model of the shimmering blue sheet. He took off the EEG headset, rubbing his tired, burning eyes."},{"type":"p","text":"\"I know,\" Leo said, looking at the beautiful, impossible material floating in his study. \"We have the blueprint. We have the software. But we need the hardware. We need the physical material.\""},{"type":"p","text":"He picked up his phone and tapped the screen, bringing up Ava's global search parameters."},{"type":"p","text":"\"That's why we need to buy a lab,\" Leo said, his eyes locking onto a specific facility on the map. \"A physics and semiconductor lab. Something with a cleanroom, chemical baths, and the right equipment. And looking at the financial news… I know exactly who is desperate enough to sell.\""}]}]</script>
+<script>
+(function(){
+  var chapters = JSON.parse(document.getElementById('chapters-data').textContent);
+  var state = {
+    current: 0,
+    fontSize: 18,
+    theme: 'dark',
+    visited: {}
+  };
+
+  var railList = document.getElementById('rail-list');
+  var readerInner = document.getElementById('reader-inner');
+  var topbarChapter = document.getElementById('topbar-chapter');
+  var progressFill = document.getElementById('progress-fill');
+  var rail = document.getElementById('rail');
+  var railBackdrop = document.getElementById('rail-backdrop');
+  var menuBtn = document.getElementById('menu-btn');
+  var topBtn = document.getElementById('top-btn');
+
+  function wordsToMinutes(wordCount){
+    return Math.max(1, Math.round(wordCount / 220));
+  }
+
+  function chapterWordCount(ch){
+    var total = 0;
+    ch.blocks.forEach(function(b){
+      if (b.text) total += b.text.split(/\s+/).length;
+    });
+    return total;
+  }
+
+  function escapeHtml(s){
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function renderSystemBlock(text){
+    var lines = text.split('\n');
+    var head = lines[0] || '';
+    var rest = lines.slice(1).join('\n');
+    return '<div class="system-block"><span class="sys-head">' + escapeHtml(head) + '</span>' + escapeHtml(rest) + '</div>';
+  }
+
+  function renderNotify(text){
+    return '<div class="notify-block">◈ ' + escapeHtml(text.replace(/^\[|\]$/g,'')) + '</div>';
+  }
+
+  function renderImage(src, caption){
+    var html = '<div class="chapter-image">';
+    html += '<img src="' + escapeHtml(src) + '" alt="' + escapeHtml(caption || '') + '" loading="lazy">';
+    if (caption){
+      html += '<div class="caption">' + escapeHtml(caption) + '</div>';
+    }
+    html += '</div>';
+    return html;
+  }
+
+  function renderChapter(idx){
+    var ch = chapters[idx];
+    state.visited[idx] = true;
+
+    var html = '';
+    html += '<div class="chapter-header">';
+    html += '  <div class="eyebrow"><span class="rule"></span>CHAPTER ' + ch.num + '</div>';
+    html += '  <h1>' + escapeHtml(ch.title) + '</h1>';
+    html += '  <div class="read-time">' + wordsToMinutes(chapterWordCount(ch)) + ' min read</div>';
+    html += '</div>';
+    html += '<div class="prose">';
+
+    ch.blocks.forEach(function(b){
+      if (b.type === 'divider'){
+        html += '<div class="divider"><span class="diamond"></span><span class="diamond"></span><span class="diamond"></span></div>';
+      } else if (b.type === 'system'){
+        html += renderSystemBlock(b.text);
+      } else if (b.type === 'notify'){
+        html += renderNotify(b.text);
+      } else if (b.type === 'image'){
+        html += renderImage(b.src, b.caption || '');
+      } else {
+        html += '<p>' + escapeHtml(b.text) + '</p>';
+      }
+    });
+
+    html += '</div>';
+
+    html += '<div id="chapter-footer">';
+    if (idx > 0){
+      html += '<a class="foot-nav prev" data-nav="' + (idx-1) + '"><span class="label">← PREVIOUS</span><span class="cname">Ch. ' + chapters[idx-1].num + ' — ' + escapeHtml(chapters[idx-1].title) + '</span></a>';
+    } else {
+      html += '<div class="foot-nav prev disabled"><span class="label">← PREVIOUS</span><span class="cname">—</span></div>';
+    }
+    if (idx < chapters.length - 1){
+      html += '<a class="foot-nav next" data-nav="' + (idx+1) + '"><span class="label">NEXT →</span><span class="cname">Ch. ' + chapters[idx+1].num + ' — ' + escapeHtml(chapters[idx+1].title) + '</span></a>';
+    } else {
+      html += '<div class="foot-nav next disabled"><span class="label">NEXT →</span><span class="cname">—</span></div>';
+    }
+    html += '</div>';
+
+    readerInner.innerHTML = html;
+
+    var footNavs = readerInner.querySelectorAll('[data-nav]');
+    footNavs.forEach(function(el){
+      el.addEventListener('click', function(){
+        goToChapter(parseInt(el.getAttribute('data-nav'), 10));
+      });
+    });
+
+    topbarChapter.textContent = 'Ch. ' + ch.num;
+    document.title = 'Ch. ' + ch.num + ' — ' + ch.title;
+  }
+
+  function renderRail(){
+    var html = '';
+    chapters.forEach(function(ch, idx){
+      var wc = chapterWordCount(ch);
+      html += '<div class="chapter-nav-item' + (idx === state.current ? ' current' : '') + (state.visited[idx] ? ' visited' : '') + '" data-idx="' + idx + '">';
+      html += '  <div class="num">' + String(ch.num) + '</div>';
+      html += '  <div class="meta">';
+      html += '    <div class="title">' + escapeHtml(ch.title) + '</div>';
+      html += '    <div class="sub">' + wordsToMinutes(wc) + ' MIN</div>';
+      html += '  </div>';
+      html += '  <div class="read-dot"></div>';
+      html += '</div>';
+    });
+    railList.innerHTML = html;
+
+    railList.querySelectorAll('.chapter-nav-item').forEach(function(el){
+      el.addEventListener('click', function(){
+        goToChapter(parseInt(el.getAttribute('data-idx'), 10));
+        closeRailMobile();
+      });
+    });
+  }
+
+  function goToChapter(idx){
+    state.current = idx;
+    renderChapter(idx);
+    renderRail();
+    window.scrollTo({top:0, behavior:'instant' in window ? 'instant' : 'auto'});
+    updateProgress();
+  }
+
+  function updateProgress(){
+    var scrollTop = window.scrollY || document.documentElement.scrollTop;
+    var docHeight = document.documentElement.scrollHeight - window.innerHeight;
+    var pct = docHeight > 0 ? Math.min(100, Math.max(0, (scrollTop / docHeight) * 100)) : 0;
+    progressFill.style.width = pct + '%';
+    topBtn.classList.toggle('show', scrollTop > 500);
+  }
+
+  window.addEventListener('scroll', updateProgress, {passive:true});
+  window.addEventListener('resize', updateProgress);
+
+  topBtn.addEventListener('click', function(){
+    window.scrollTo({top:0, behavior:'smooth'});
+  });
+
+  // Font size controls
+  document.getElementById('font-inc').addEventListener('click', function(){
+    state.fontSize = Math.min(24, state.fontSize + 1);
+    document.documentElement.style.setProperty('--reader-size', state.fontSize + 'px');
+  });
+  document.getElementById('font-dec').addEventListener('click', function(){
+    state.fontSize = Math.max(14, state.fontSize - 1);
+    document.documentElement.style.setProperty('--reader-size', state.fontSize + 'px');
+  });
+
+  // Theme toggle
+  var themeBtn = document.getElementById('theme-toggle');
+  themeBtn.addEventListener('click', function(){
+    state.theme = state.theme === 'dark' ? 'sepia' : 'dark';
+    document.body.setAttribute('data-theme', state.theme);
+    themeBtn.textContent = state.theme === 'dark' ? '◐ Sepia' : '◑ Night';
+  });
+
+  // Mobile rail toggle
+  function openRailMobile(){
+    rail.classList.add('open');
+    railBackdrop.classList.add('open');
+  }
+  function closeRailMobile(){
+    rail.classList.remove('open');
+    railBackdrop.classList.remove('open');
+  }
+  menuBtn.addEventListener('click', function(){
+    if (rail.classList.contains('open')) closeRailMobile(); else openRailMobile();
+  });
+  railBackdrop.addEventListener('click', closeRailMobile);
+
+  // Init
+  document.documentElement.style.setProperty('--reader-size', state.fontSize + 'px');
+  renderRail();
+  renderChapter(0);
+  updateProgress();
+})();
+
+</script>
+</body>
+</html>
